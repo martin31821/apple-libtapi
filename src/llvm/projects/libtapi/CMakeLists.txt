@@ -171,6 +171,8 @@ endfunction(tapi_clang_tablegen)
 include_directories(BEFORE
   ${CMAKE_CURRENT_BINARY_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../clang/include
+  ${CMAKE_CURRENT_BINARY_DIR}/../clang/include
   )
 
 option(TAPI_INCLUDE_TESTS "Generate build targets for the TAPI unit tests."
