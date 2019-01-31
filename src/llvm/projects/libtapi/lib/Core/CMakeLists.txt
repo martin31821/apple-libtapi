@@ -11,7 +11,6 @@ add_tapi_library(tapiCore
   AvailabilityInfo.cpp
   Configuration.cpp
   ConfigurationFile.cpp
-  FakeSymbols.cpp
   FileManager.cpp
   FileSystem.cpp
   Framework.cpp

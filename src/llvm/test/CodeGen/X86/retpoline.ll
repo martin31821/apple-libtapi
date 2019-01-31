@@ -19,7 +19,7 @@ entry:
 ; X64-LABEL: icall_reg:
 ; X64-DAG:   movq %rdi, %[[fp:[^ ]*]]
 ; X64-DAG:   movl %esi, %[[x:[^ ]*]]
-; X64:       movl %[[x]], %edi
+; X64:       movl %esi, %edi
 ; X64:       callq bar
 ; X64-DAG:   movl %[[x]], %edi
 ; X64-DAG:   movq %[[fp]], %r11
@@ -111,7 +111,7 @@ define void @vcall(%struct.Foo* %obj) #0 {
 
 ; X64-LABEL: vcall:
 ; X64:       movq %rdi, %[[obj:[^ ]*]]
-; X64:       movq (%[[obj]]), %[[vptr:[^ ]*]]
+; X64:       movq (%rdi), %[[vptr:[^ ]*]]
 ; X64:       movq 8(%[[vptr]]), %[[fp:[^ ]*]]
 ; X64:       movq %[[fp]], %r11
 ; X64:       callq __llvm_retpoline_r11
@@ -164,19 +164,23 @@ define void @nonlazybind_caller() #0 {
   ret void
 }
 
-; nonlazybind wasn't implemented in LLVM 5.0, so this looks the same as direct.
 ; X64-LABEL: nonlazybind_caller:
-; X64:       callq nonlazybind_callee
-; X64:       jmp nonlazybind_callee # TAILCALL
+; X64:       movq nonlazybind_callee@GOTPCREL(%rip), %[[REG:.*]]
+; X64:       movq %[[REG]], %r11
+; X64:       callq __llvm_retpoline_r11
+; X64:       movq %[[REG]], %r11
+; X64:       jmp __llvm_retpoline_r11 # TAILCALL
 ; X64FAST-LABEL: nonlazybind_caller:
-; X64FAST:   callq nonlazybind_callee
-; X64FAST:   jmp nonlazybind_callee # TAILCALL
+; X64FAST:   movq nonlazybind_callee@GOTPCREL(%rip), %r11
+; X64FAST:   callq __llvm_retpoline_r11
+; X64FAST:   movq nonlazybind_callee@GOTPCREL(%rip), %r11
+; X64FAST:   jmp __llvm_retpoline_r11 # TAILCALL
 ; X86-LABEL: nonlazybind_caller:
-; X86:       calll nonlazybind_callee
-; X86:       jmp nonlazybind_callee # TAILCALL
+; X86:       calll nonlazybind_callee@PLT
+; X86:       jmp nonlazybind_callee@PLT # TAILCALL
 ; X86FAST-LABEL: nonlazybind_caller:
-; X86FAST:   calll nonlazybind_callee
-; X86FAST:   jmp nonlazybind_callee # TAILCALL
+; X86FAST:   calll nonlazybind_callee@PLT
+; X86FAST:   jmp nonlazybind_callee@PLT # TAILCALL
 
 
 @indirectbr_rewrite.targets = constant [10 x i8*] [i8* blockaddress(@indirectbr_rewrite, %bb0),

@@ -1,4 +1,4 @@
-llvm: 5.0.2
-clang: 5.0.2
+llvm: 7.0.1
+clang: 7.0.1
 tapi: 2.0.0
 

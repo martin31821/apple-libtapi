@@ -1,5 +1,5 @@
-; RUN: llc -march=amdgcn -mcpu=tahiti -start-after=sink -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-SAFE -check-prefix=SI -check-prefix=FUNC %s
-; RUN: llc -enable-no-signed-zeros-fp-math -march=amdgcn -mcpu=tahiti -start-after=sink -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-NSZ -check-prefix=SI -check-prefix=FUNC %s
+; RUN: llc -march=amdgcn -mcpu=tahiti -start-after=sink -verify-machineinstrs < %s | FileCheck -enable-var-scope -check-prefix=GCN -check-prefix=GCN-SAFE -check-prefix=SI -check-prefix=FUNC %s
+; RUN: llc -enable-no-signed-zeros-fp-math -march=amdgcn -mcpu=tahiti -start-after=sink -verify-machineinstrs < %s | FileCheck -enable-var-scope -check-prefix=GCN -check-prefix=GCN-NSZ -check-prefix=SI -check-prefix=FUNC %s
 
 ; --------------------------------------------------------------------------------
 ; fadd tests
@@ -59,7 +59,7 @@ define amdgpu_kernel void @v_fneg_add_store_use_add_f32(float addrspace(1)* %out
 ; GCN-SAFE: v_mul_f32_e32 [[MUL:v[0-9]+]], 4.0, [[ADD]]
 
 ; GCN-NSZ: v_sub_f32_e64 [[NEG_ADD:v[0-9]+]], -[[A]], [[B]]
-; GCN-NSZ-NEXT: v_mul_f32_e32 [[MUL:v[0-9]+]], -4.0, [[ADD]]
+; GCN-NSZ-NEXT: v_mul_f32_e32 [[MUL:v[0-9]+]], -4.0, [[NEG_ADD]]
 ; GCN: buffer_store_dword [[NEG_ADD]]
 ; GCN-NEXT: buffer_store_dword [[MUL]]
 define amdgpu_kernel void @v_fneg_add_multi_use_add_f32(float addrspace(1)* %out, float addrspace(1)* %a.ptr, float addrspace(1)* %b.ptr) #0 {
@@ -513,7 +513,7 @@ define amdgpu_kernel void @v_fneg_0_minnum_foldable_use_f32(float addrspace(1)* 
 ; GCN: {{buffer|flat}}_load_dword [[A:v[0-9]+]]
 ; GCN: {{buffer|flat}}_load_dword [[B:v[0-9]+]]
 ; GCN: v_max_f32_e64 [[MAX0:v[0-9]+]], -[[A]], -[[B]]
-; GCN-NEXT: v_mul_f32_e32 [[MUL1:v[0-9]+]], -4.0, [[MUL0]]
+; GCN-NEXT: v_mul_f32_e32 [[MUL1:v[0-9]+]], -4.0, [[MAX0]]
 ; GCN-NEXT: buffer_store_dword [[MAX0]]
 ; GCN-NEXT: buffer_store_dword [[MUL1]]
 define amdgpu_kernel void @v_fneg_minnum_multi_use_minnum_f32(float addrspace(1)* %out, float addrspace(1)* %a.ptr, float addrspace(1)* %b.ptr) #0 {
@@ -660,7 +660,7 @@ define amdgpu_kernel void @v_fneg_0_maxnum_foldable_use_f32(float addrspace(1)* 
 ; GCN: {{buffer|flat}}_load_dword [[A:v[0-9]+]]
 ; GCN: {{buffer|flat}}_load_dword [[B:v[0-9]+]]
 ; GCN: v_min_f32_e64 [[MAX0:v[0-9]+]], -[[A]], -[[B]]
-; GCN-NEXT: v_mul_f32_e32 [[MUL1:v[0-9]+]], -4.0, [[MUL0]]
+; GCN-NEXT: v_mul_f32_e32 [[MUL1:v[0-9]+]], -4.0, [[MAX0]]
 ; GCN-NEXT: buffer_store_dword [[MAX0]]
 ; GCN-NEXT: buffer_store_dword [[MUL1]]
 define amdgpu_kernel void @v_fneg_maxnum_multi_use_maxnum_f32(float addrspace(1)* %out, float addrspace(1)* %a.ptr, float addrspace(1)* %b.ptr) #0 {
@@ -1725,6 +1725,26 @@ define amdgpu_kernel void @v_fneg_nearbyint_f32(float addrspace(1)* %out, float 
 }
 
 ; --------------------------------------------------------------------------------
+; fcanonicalize tests
+; --------------------------------------------------------------------------------
+
+; GCN-LABEL: {{^}}v_fneg_canonicalize_f32:
+; GCN: {{buffer|flat}}_load_dword [[A:v[0-9]+]]
+; GCN: v_mul_f32_e32 [[RESULT:v[0-9]+]], -1.0, [[A]]
+; GCN: buffer_store_dword [[RESULT]]
+define amdgpu_kernel void @v_fneg_canonicalize_f32(float addrspace(1)* %out, float addrspace(1)* %a.ptr) #0 {
+  %tid = call i32 @llvm.amdgcn.workitem.id.x()
+  %tid.ext = sext i32 %tid to i64
+  %a.gep = getelementptr inbounds float, float addrspace(1)* %a.ptr, i64 %tid.ext
+  %out.gep = getelementptr inbounds float, float addrspace(1)* %out, i64 %tid.ext
+  %a = load volatile float, float addrspace(1)* %a.gep
+  %trunc = call float @llvm.canonicalize.f32(float %a)
+  %fneg = fsub float -0.0, %trunc
+  store float %fneg, float addrspace(1)* %out.gep
+  ret void
+}
+
+; --------------------------------------------------------------------------------
 ; vintrp tests
 ; --------------------------------------------------------------------------------
 
@@ -2117,6 +2137,7 @@ declare float @llvm.trunc.f32(float) #1
 declare float @llvm.round.f32(float) #1
 declare float @llvm.rint.f32(float) #1
 declare float @llvm.nearbyint.f32(float) #1
+declare float @llvm.canonicalize.f32(float) #1
 declare float @llvm.minnum.f32(float, float) #1
 declare float @llvm.maxnum.f32(float, float) #1
 
