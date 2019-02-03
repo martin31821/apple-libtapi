@@ -51,7 +51,13 @@ cmake ../src/llvm \
  -DCMAKE_BUILD_TYPE=RELEASE \
  -DCMAKE_INSTALL_PREFIX=$INSTALLPREFIX \
  $CMAKE_EXTRA_ARGS
-$MAKE libtapi -j $JOBS
-
+tries=0
+until [ $tries -ge 20 ]
+do
+  $MAKE libtapi -j $JOBS && break
+  tries=$[$tries+1]
+  echo 'Make failed, retrying.'
+  echo 'This is expected.'
+done
 popd &>/dev/null
 popd &>/dev/null
